@@ -1,0 +1,22 @@
+prompt:
+  bookends:
+      - [ professional photo of a         , ", 50mm f/5.6 on fujicolor pro 800z" ]
+      - [ oil painting using impasto of a , ", brush strokes, palette knife technique" ]
+  feels:
+      - ?2
+      - happy
+      - sad
+  who:
+      - Rami Malek
+      - man
+      - woman
+  where:
+       - ?1
+       - in a busy city square
+       - in a fancy upscale italian restaurant
+       - in a futuristic drinks bar of a space station
+       - transforming+++ into a eyeless++ soulless+++ mess of wires and circuits and vacuum tubes and black plastic
+  template: ({feels})+ ({who})++ ({where})-
+  negatives:
+       - ""
+       - "[sketch, drawing, cartoon, pixar, zombie--]"
