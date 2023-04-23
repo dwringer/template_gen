@@ -37,6 +37,6 @@ Now load the invoke developer console:
 
     >>> printTemplate("example_output.yaml", makePrompts(10), models=["526mixV14_v14", "verisimilitude"])
 
-Now, from a new terminal, go to the path containing the invoke executable (invokeai\.venv\Scripts on Windows) and run invoke specifying the path to the template thus created. The above call to printTemplate assumes you have the models 526mixV14_v14 and verisimilitude installed. Change as needed!
+The above call to printTemplate assumes you have the models 526mixV14_v14 and verisimilitude installed. Change as needed! Now, from a new terminal, go to the path containing the invoke executable (invokeai\.venv\Scripts on Windows) and run invoke specifying the path to the template thus created.
 
     C:\[path-to]\invokeai\.venv\Scripts>invoke --from_file ../../gen/example_output.yaml
