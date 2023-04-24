@@ -35,8 +35,8 @@ Now load the invoke developer console:
     oil painting using impasto of a (Rami Malek)++ (in a futuristic drinks bar of a space station)-, brush strokes, palette knife technique [sketch, drawing, cartoon, pixar, zombie--]
     oil painting using impasto of a (man)++ (in a futuristic drinks bar of a space station)-, brush strokes, palette knife technique [sketch, drawing, cartoon, pixar, zombie--]
 
-    >>> printTemplate("example_output.yaml", makePrompts(10), models=["526mixV14_v14", "verisimilitude"])
+    >>> printTemplate("example_output.txt", makePrompts(10), models=["526mixV14_v14", "verisimilitude"])
 
 The above call to printTemplate assumes you have the models 526mixV14_v14 and verisimilitude installed. Change as needed! Now, from a new terminal, go to the path containing the invoke executable (invokeai\\.venv\\Scripts on Windows) and run invoke specifying the path to the template thus created.
 
-    C:\[path-to]\invokeai\.venv\Scripts>invoke --from_file ../../gen/example_output.yaml
+    C:\[path-to]\invokeai\.venv\Scripts>invoke --from_file ../../gen/example_output.txt
