@@ -23,7 +23,7 @@ Now load the invoke developer console:
     Please enter 1-10, Q: [2] 8
 
     (.venv) C:\[path-to]\invokeai>cd gen
-    (.venv) C:\[path-to]\invokeai\gen>python -i templ-gen.py
+    (.venv) C:\[path-to]\invokeai\gen>python -i template_gen.py
 
     >>> loadTemplate("example_template.yaml")
 
