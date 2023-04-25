@@ -3,10 +3,51 @@ import re
 
 from omegaconf import OmegaConf, dictconfig
 
+
 LOOKUP_TABLE = {}
 TEMPLATES = []
 NEGATIVES = []
 
+generator = None
+
+
+def loadPipeline(model, tokenizer, task='text-generation', device=-1):  # device=0 will use CUDA
+  from transformers import pipeline
+
+  return pipeline(model=model, tokenizer=tokenizer, task=task, device=device)
+
+def cleanup(str):
+    # Condense whitespace
+    _str = re.sub(r"\s+", " ", str, 0)
+    _str = re.sub(r"\s,\s", ", ", _str, 0)
+    # Remove empty sets of parens
+    _str = re.sub(r"\(\)[\+\-]*", "", _str)
+    # Condense whitespace again
+    _str = re.sub(r"\s+", " ", _str, 0)
+    _str = re.sub(r"\s,\s", ", ", _str, 0)
+    _str = re.sub(r",+\s", ", ", _str, 0)
+    # Remove instances of "a apple" errors by subbing "an", w/ or w/o parens in the way.
+    _str = re.sub(r"(\sa\s)([\(]*)([aeiouAEIOU])", lambda match: (" an " + match.group(2) + match.group(3)), _str)
+    return _str
+
+def addNegatives(prompts):
+  return [(p + " " + random.choice(NEGATIVES)) for p in prompts]
+  
+def makePromptsP(prompt: str = "",
+                 top_p: float = 0.9,
+                 top_k: int = 40,
+                 n: int = 20,
+                 temp: float = 1.4,
+                 max_new_tokens: int = 150):
+  outputs = generator(prompt,
+                      max_new_tokens=max_new_tokens,
+                      temperature=temp,
+                      do_sample=True,
+                      top_p=top_p,
+                      top_k=top_k,
+                      num_return_sequences=n)
+  items = set([cleanup(re.sub(r"\n", " ", output['generated_text'], 0)) for output in outputs])
+  return items
 
 def loadTemplate(filename):
   "This loads a template file following the pattern of example_template.yaml"
@@ -33,7 +74,6 @@ def loadTemplate(filename):
         else:
           LOOKUP_TABLE[k].extend(v)
 
-
 def makePrompts(n,
                 lookups=LOOKUP_TABLE,
                 template_string=None,
@@ -47,8 +87,7 @@ def makePrompts(n,
     _camera = random.choice(lookups["bookends"])
     _str = _camera[0] + " "
     # We grab a random template then use the same logic as dynamic_prompts.py
-    if template_string is None:
-        template_string = random.choice(TEMPLATES)
+    template_string = random.choice(TEMPLATES)
     _templateSplit = re.split(r'({\w+})', template_string)
     for word in _templateSplit:
       if re.fullmatch(r'({\w+})', word):
@@ -65,18 +104,8 @@ def makePrompts(n,
       _str = re.sub(r"\-+,", ",", _str, 0)
     if remove_negatives:
       # strip out anything between []
-      _str = re.sub(r"\[.*\]", "", _str, 0)
-    # Condense whitespace
-    _str = re.sub(r"\s+", " ", _str, 0)
-    _str = re.sub(r"\s,\s", ", ", _str, 0)
-    # Remove empty sets of parens
-    _str = re.sub(r"\(\)[\+\-]*", "", _str)
-    # Condense whitespace again
-    _str = re.sub(r"\s+", " ", _str, 0)
-    _str = re.sub(r"\s,\s", ", ", _str, 0)
-    _str = re.sub(r",+\s", ", ", _str, 0)
-    # Remove instances of "a apple" errors by subbing "an", w/ or w/o parens in the way.
-    _str = re.sub(r"(\sa\s)([\(]*)([aeiouAEIOU])", lambda match: (" an " + match.group(2) + match.group(3)), _str)
+      _str = re.sub(r"\[[^\]\[]*\]", "", _str, 0)
+    _str = cleanup(_str)
 
     if not (remove_negatives or (not base_negatives)):
       _str = _str + " " + random.choice(base_negatives)
@@ -92,17 +121,16 @@ def printTemplate(filename,
                   height=512,
                   perlin=0,
                   threshold=0,
-                  models=["526mixV14_v14"],
-                  base_negatives=NEGATIVES,
+                  models=["526mixV145_v145"],
                   args=None,
                   seed=None):
   "This function prints a template file in the same format as invokeai-batch outputs, run with `invoke --from_file filename`"
   if args is None:
     args = "-A" + sampler + " -C" + str(cfg) + " -s" + str(steps) + "  --perlin=" + str(perlin) + " --threshold=" + str(threshold) + " -W" + str(width) + " -H" + str(height)
   if prompts is None:
-    prompts = makePrompts(2500, remove_negatives=False, base_negatives=base_negatives)
+    prompts = makePrompts(300)
   promptLines = [(p + " " + "-S" + (str(seed if seed is not None else random.randint(0, 1000000000))) + " " + args) for p in prompts]
-  with open(filename, 'w') as outf:
+  with open(filename, 'w', encoding='utf8') as outf:
     for model in models:
       outf.writelines(["!switch " + model + '\n'])
       outf.writelines([line + '\n' for line in promptLines])
