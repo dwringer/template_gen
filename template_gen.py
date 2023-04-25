@@ -1,7 +1,7 @@
 import random
 import re
 
-from omegaconf import OmegaConf, dictconfig
+from omegaconf import OmegaConf, listconfig, dictconfig
 
 
 LOOKUP_TABLE = {}
@@ -78,15 +78,20 @@ def loadTemplate(filename):
         else:
           LOOKUP_TABLE[k].extend(v)
 
-def templateExpand(s, lookups=LOOKUP_TABLE):
+def templateExpand(s, lookups=LOOKUP_TABLE, reflection=""):
   _split = re.split(r'({\w+})', s)
   result = ""
   for word in _split:
     if re.fullmatch(r'({\w+})', word):
-      result = result + random.choice(lookups[word[1:-1]])
+      _lookup = random.choice(lookups[word[1:-1]])
+      if isinstance(_lookup, listconfig.ListConfig):
+        result = result + _lookup[0]
+        reflection = " " + _lookup[1] + reflection
+      else:
+        result = result + _lookup
     else:
-      result = result+ word
-  return result
+      result = result + word
+  return result, reflection
 
 def makePrompts(n,
                 lookups=LOOKUP_TABLE,
@@ -99,13 +104,19 @@ def makePrompts(n,
   if template_strings is None:
     template_strings = TEMPLATES
   for i in range(n):
-    # The "bookends" key from template yaml's contains [before, after] pairs to surround prompts:
-    _camera = random.choice(lookups["bookends"])
-    _str = templateExpand(_camera[0] + " " + random.choice(template_strings) + " " + _camera[1], lookups=lookups)
-    _next = templateExpand(_str, lookups=lookups)
-    while (_next != _str):
+    _str, _reflection = templateExpand(random.choice(template_strings), reflection="")
+    _next, _reflection = templateExpand(_str, lookups=lookups, reflection=_reflection)
+    while ((_next != _str) or (re.search(r'{\w+}', _str))):
       _str = _next
-      _next = templateExpand(_str, lookups=lookups)
+      _next, _reflection = templateExpand(_str, lookups=lookups, reflection=_reflection)
+    # _reflection is a parallel prompt built in reverse during expansion
+    while _reflection != "":
+      _appendix = _reflection
+      _next, _reflection = templateExpand(_appendix, lookups=lookups, reflection="") #_reflection)
+      while ((_next != _appendix) or (re.search(r'{\w+}', _appendix))):
+        _appendix = _next
+        _next, _reflection = templateExpand(_appendix, lookups=lookups, reflection=_reflection)
+      _str = _str + _appendix
 
     # Regex stuff, hastily implemented:
     if random.random() < strip_parens_probability:
@@ -120,7 +131,7 @@ def makePrompts(n,
 
     if not (remove_negatives or (not base_negatives)):
       _str = _str + " " + random.choice(base_negatives)
-    results.append(_str)
+    results.append(_str.strip())
   return results
 
 def printTemplate(filename,

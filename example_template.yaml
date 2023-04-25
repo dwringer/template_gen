@@ -1,22 +1,28 @@
 prompt:
-  bookends:
+  bookendsC:  # The C indicates chiastic function - a parallel buffer grows in reverse to attach at the end of the prompt
       - [ professional photo of a         , ", 50mm f/5.6 on fujicolor pro 800z" ]
       - [ oil painting using impasto of a , ", brush strokes, palette knife technique" ]
   feels:
       - ?2
       - happy
       - sad
+  feelsC:
+      - ?2
+      - [ happy , ", grinning+ widely" ]
+      - [ sad   , ", pouting+ glumly" ]
   who:
       - Rami Malek
       - man
       - woman
   where:
-       - ?1
-       - in a busy city square
-       - in a fancy upscale italian restaurant
-       - in a futuristic drinks bar of a space station
-       - transforming+++ into a eyeless++ soulless+++ mess of wires and circuits and vacuum tubes and black plastic
-  template: ({feels})+ ({who})++ ({where})-
+      - ?1
+      - in a busy city square
+      - in a fancy upscale italian restaurant
+      - in a futuristic drinks bar of a space station
+      - transforming+++ into a eyeless++ soulless+++ mess of wires and circuits and vacuum tubes and black plastic
+  templates:
+      - "{bookendsC} ({feels})+ ({who})++ ({where})-"
+      - "{bookendsC} ({feelsC})+ ({who})++ ({where})-"
   negatives:
-       - ""
-       - "[sketch, drawing, cartoon, pixar, zombie--]"
+      - ""
+      - "[sketch, drawing, cartoon, pixar, zombie--]"
