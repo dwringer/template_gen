@@ -34,13 +34,13 @@ def addNegatives(prompts):
   return [(p + " " + random.choice(NEGATIVES)) for p in prompts]
   
 def makePromptsP(prompt: str = "",
-                 p: float = 0.9,
-                 k: int = 40,
-                 n: int = 20,
                  temp: float = 1.4,
-                 max_new_tokens: int = 150):
+                 k: int = 40,
+                 p: float = 0.9,
+                 n: int = 20,
+                 mnt: int = 150):
   _outputs = generator(prompt,
-                       max_new_tokens=max_new_tokens,
+                       max_new_tokens=mnt,
                        temperature=temp,
                        do_sample=True,
                        top_p=p,
@@ -63,6 +63,7 @@ def loadTemplate(filename):
       elif (k == "negative"):
         NEGATIVES.append(v)
       elif (k == "negatives"):
+        # - ?N, where N is a number, in slot 1, is treated as an instruction to add N "empty" choices:
         if isinstance(v[0], str) and (re.match(r"\?[\d]+$", v[0]) is not None):
           NEGATIVES.extend(["" for number_of_times in range(int(v[0][1:]))])
           NEGATIVES.extend([subvalue for subvalue in v[1:]])
@@ -71,7 +72,6 @@ def loadTemplate(filename):
       else:
         if (k not in LOOKUP_TABLE):
           LOOKUP_TABLE[k] = []
-        # - ?N, where N is a number, in slot 1, is treated as an instruction to add N "empty" choices:
         if isinstance(v[0], str) and (re.match(r"\?[\d]+$", v[0]) is not None):
           LOOKUP_TABLE[k].extend(["" for number_of_times in range(int(v[0][1:]))])
           LOOKUP_TABLE[k].extend([subvalue for subvalue in v[1:]])
@@ -126,8 +126,8 @@ def makePrompts(n,
 def printTemplate(filename,
                   prompts=None,
                   sampler="k_dpmpp_2",
-                  cfg="6.5",
-                  steps=42,
+                  cfg="7",
+                  steps=39,
                   width=512,
                   height=512,
                   perlin=0,
