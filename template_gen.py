@@ -16,9 +16,9 @@ def loadPipeline(model, tokenizer, task='text-generation', device=-1):  # device
 
   return pipeline(model=model, tokenizer=tokenizer, task=task, device=device)
 
-def cleanup(str):
+def cleanup(string_in):
     # Condense whitespace
-    _str = re.sub(r"\s+", " ", str, 0)
+    _str = re.sub(r"\s+", " ", string_in, 0)
     _str = re.sub(r"\s,\s", ", ", _str, 0)
     # Remove empty sets of parens
     _str = re.sub(r"\(\)[\+\-]*", "", _str)
@@ -27,26 +27,26 @@ def cleanup(str):
     _str = re.sub(r"\s,\s", ", ", _str, 0)
     _str = re.sub(r",+\s", ", ", _str, 0)
     # Remove instances of "a apple" errors by subbing "an", w/ or w/o parens in the way.
-    _str = re.sub(r"(\sa\s)([\(]*)([aeiouAEIOU])", lambda match: (" an " + match.group(2) + match.group(3)), _str)
-    return _str
+    string_out = re.sub(r"(\sa\s)([\(]*)([aeiouAEIOU])", lambda match: (" an " + match.group(2) + match.group(3)), _str)
+    return string_out
 
 def addNegatives(prompts):
   return [(p + " " + random.choice(NEGATIVES)) for p in prompts]
   
 def makePromptsP(prompt: str = "",
-                 top_p: float = 0.9,
-                 top_k: int = 40,
+                 p: float = 0.9,
+                 k: int = 40,
                  n: int = 20,
                  temp: float = 1.4,
                  max_new_tokens: int = 150):
-  outputs = generator(prompt,
-                      max_new_tokens=max_new_tokens,
-                      temperature=temp,
-                      do_sample=True,
-                      top_p=top_p,
-                      top_k=top_k,
-                      num_return_sequences=n)
-  items = set([cleanup(re.sub(r"\n", " ", output['generated_text'], 0)) for output in outputs])
+  _outputs = generator(prompt,
+                       max_new_tokens=max_new_tokens,
+                       temperature=temp,
+                       do_sample=True,
+                       top_p=p,
+                       top_k=k,
+                       num_return_sequences=n)
+  items = set([cleanup(re.sub(r"\n", " ", output['generated_text'], 0)) for output in _outputs])
   return items
 
 def loadTemplate(filename):
@@ -63,38 +63,49 @@ def loadTemplate(filename):
       elif (k == "negative"):
         NEGATIVES.append(v)
       elif (k == "negatives"):
-        NEGATIVES.extend(v)
+        if isinstance(v[0], str) and (re.match(r"\?[\d]+$", v[0]) is not None):
+          NEGATIVES.extend(["" for number_of_times in range(int(v[0][1:]))])
+          NEGATIVES.extend([subvalue for subvalue in v[1:]])
+        else:
+          NEGATIVES.extend(v)
       else:
         if (k not in LOOKUP_TABLE):
           LOOKUP_TABLE[k] = []
-        # - ?N, where N is a number, is treated as an instruction to add N "empty" choices:
+        # - ?N, where N is a number, in slot 1, is treated as an instruction to add N "empty" choices:
         if isinstance(v[0], str) and (re.match(r"\?[\d]+$", v[0]) is not None):
           LOOKUP_TABLE[k].extend(["" for number_of_times in range(int(v[0][1:]))])
           LOOKUP_TABLE[k].extend([subvalue for subvalue in v[1:]])
         else:
           LOOKUP_TABLE[k].extend(v)
 
+def templateExpand(s, lookups=LOOKUP_TABLE):
+  _split = re.split(r'({\w+})', s)
+  result = ""
+  for word in _split:
+    if re.fullmatch(r'({\w+})', word):
+      result = result + random.choice(lookups[word[1:-1]])
+    else:
+      result = result+ word
+  return result
+
 def makePrompts(n,
                 lookups=LOOKUP_TABLE,
-                template_string=None,
+                template_strings=None,
                 remove_negatives=False,
                 base_negatives=NEGATIVES,
                 strip_parens_probability=0.0):
   "This function returns a list of prompts generated from whatever templates have been loaded."
   results = []
+  if template_strings is None:
+    template_strings = TEMPLATES
   for i in range(n):
     # The "bookends" key from template yaml's contains [before, after] pairs to surround prompts:
     _camera = random.choice(lookups["bookends"])
-    _str = _camera[0] + " "
-    # We grab a random template then use the same logic as dynamic_prompts.py
-    template_string = random.choice(TEMPLATES)
-    _templateSplit = re.split(r'({\w+})', template_string)
-    for word in _templateSplit:
-      if re.fullmatch(r'({\w+})', word):
-        _str = _str + random.choice(lookups[word[1:-1]])
-      else:
-        _str = _str + word
-    _str = _str + " " + _camera[1]
+    _str = templateExpand(_camera[0] + " " + random.choice(template_strings) + " " + _camera[1], lookups=lookups)
+    _next = templateExpand(_str, lookups=lookups)
+    while (_next != _str):
+      _str = _next
+      _next = templateExpand(_str, lookups=lookups)
 
     # Regex stuff, hastily implemented:
     if random.random() < strip_parens_probability:
@@ -121,6 +132,7 @@ def printTemplate(filename,
                   height=512,
                   perlin=0,
                   threshold=0,
+                  seed_attempts=1,
                   models=["526mixV145_v145"],
                   args=None,
                   seed=None):
@@ -129,11 +141,13 @@ def printTemplate(filename,
     args = "-A" + sampler + " -C" + str(cfg) + " -s" + str(steps) + "  --perlin=" + str(perlin) + " --threshold=" + str(threshold) + " -W" + str(width) + " -H" + str(height)
   if prompts is None:
     prompts = makePrompts(300)
-  promptLines = [(p + " " + "-S" + (str(seed if seed is not None else random.randint(0, 1000000000))) + " " + args) for p in prompts]
+  promptLines = []
+  for p in prompts:
+    if seed is not None:
+      promptLines.append(p + " " + "-S" + str(seed) + " " + args)
+    else:
+      promptLines.extend([(p + " -S" + str(random.randint(0, 1000000000)) + " " + args) for i in range(seed_attempts)])
   with open(filename, 'w', encoding='utf8') as outf:
     for model in models:
       outf.writelines(["!switch " + model + '\n'])
       outf.writelines([line + '\n' for line in promptLines])
-
-    
-    
