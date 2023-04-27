@@ -24,4 +24,4 @@ prompt:
       - "{bookends} ({feels})+ ({who})++ ({where})-"
   negatives:
       - ""
-      - "[sketch, drawing, cartoon, pixar, zombie--]"
+      - 2 * [sketch, drawing, cartoon, pixar, zombie--] # The "2 *" prefix multiplies likelihood by two.
