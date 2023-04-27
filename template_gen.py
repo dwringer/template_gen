@@ -10,19 +10,64 @@ LOOKUP_TABLE = {'templates': [], 'negatives': []}
 generator = None
 
 
+def prefixer(a : str, b: str):
+  "Attach pre/suffixes (indicated w/'@@') and rearrange parens/+/-"
+  # print("> " + a + " @@ " + b)  # in case of bugs, uncomment these
+  result = None
+  if re.match(r"[\)\+\-]+$", b):
+    result = a + b + " @@"
+  else:
+    # Allow a single trailing hyphen but move the rest of ), +, -:
+    _aWeighting = re.match(r"\S*?(-?)([\)*\+\-]*)\s*$", a)
+    _newA = a
+    if _aWeighting is not None:
+      _newA = a[0:_aWeighting.start(2)]
+      _aWeighting = _aWeighting[2]
+    # grab parens from the front of b:
+    _bWeighting = re.match(r"\s*(\(*)(\S*)", b)
+    _newB = b
+    if _bWeighting is not None:
+      _newB = _bWeighting[2]
+      _bWeighting = _bWeighting[1]
+    # now subtract the parens that cancel out:
+    _newAWeighting = _aWeighting
+    _newBWeighting = ""
+    for char in _bWeighting:
+      if char == '(':
+        _newAWeighting = _aWeighting.replace(")", "", 1)
+        if _newAWeighting == _aWeighting:
+          _newBWeighting = _newBWeighting + char
+        _aWeighting = _newAWeighting
+      else:
+        _newBWeighting = _newBWeighting + char
+    _raw = _newBWeighting + _newA + _newB + _newAWeighting
+    # print("> " + _newBWeighting + " || " + _newA + " || " + _newB + " || " + _newAWeighting)
+    # then subtract trailing +-'s that cancel
+    result = _raw.replace("+-", "", 1)
+    while _raw != result:
+      _raw = result
+      result = _raw.replace("+-", "", 1)
+  # print("> " + result)
+  return result
+
 def cleanup(string_in : str):
   "Regex to clean formatting typos occurring during generation (TODO: improve)"
   # Condense whitespace
   _str = re.sub(r"\s+", " ", string_in, 0)
-  _str = re.sub(r"\s,\s", ", ", _str, 0)
+  _str = re.sub(r"\s([,;])\s", lambda match: (match.group(1) + " "), _str, 0)
   # Remove empty sets of parens
   _str = re.sub(r"\(\)[\+\-]*", "", _str)
   # Condense whitespace again
   _str = re.sub(r"\s+", " ", _str, 0)
-  _str = re.sub(r"\s,\s", ", ", _str, 0)
+  _str = re.sub(r"\s([,;])\s", lambda match: (match.group(1) +  " "), _str, 0)
   _str = re.sub(r",+\s", ", ", _str, 0)
+  # Now we attempt to combine prefixes and suffixes.
+  _collapsed = re.sub(r"(\S+?)\s*@@\s*(\S+)", lambda match: prefixer(match.group(1), match.group(2)), _str, 0)
+  while _collapsed != _str:
+    _str = _collapsed
+    _collapsed = re.sub(r"(\S+?)\s*@@\s*(\S+)", lambda match: prefixer(match.group(1), match.group(2)), _str, 0)
   # Remove instances of "a apple" errors by subbing "an", w/ or w/o parens in the way.
-  string_out = re.sub(r"(\sa\s)([\(]*)([aeiouAEIOU])", lambda match: (" an " + match.group(2) + match.group(3)), _str)
+  string_out = re.sub(r"(\sa\s)([\(]*)([aeiouAEIOU])", lambda match: (" an " + match.group(2) + match.group(3)), _str, 0)
   return string_out
 
 def addNegatives(prompts : list):
@@ -83,11 +128,18 @@ def templateExpand(s :          str,
   for word in _split:
     if re.fullmatch(r'({\w+})', word):
       _lookup = random.choice(lookups[word[1:-1]])
+      _resultAppendix, _reflectionPrependix = None, None
       if isinstance(_lookup, (list, listconfig.ListConfig)):
-        result = result + _lookup[0]
-        reflection = " " + _lookup[1] + reflection
+        _resultAppendix = _lookup[0]
+        _reflectionPrependix = _lookup[1]
+#        result = result + _lookup[0]
+#        reflection = " " + _lookup[1] + reflection
       else:
-        result = result + _lookup
+        _resultAppendix = _lookup
+#        result = result + _lookup
+      result = result + _resultAppendix
+      if _reflectionPrependix is not None:
+        reflection = " " + _reflectionPrependix + reflection
     else:
       result = result + word
   return result, reflection
@@ -113,7 +165,7 @@ def makePrompts(n :                        int,
     # _reflection is a parallel prompt built in reverse during expansion
     while _reflection != "":
       _appendix = _reflection
-      _next, _reflection = templateExpand(_appendix, lookups=lookups, reflection="") #_reflection)
+      _next, _reflection = templateExpand(_appendix, lookups=lookups, reflection="")
       while ((_next != _appendix) or (re.search(r'{\w+}', _appendix))):
         _appendix = _next
         _next, _reflection = templateExpand(_appendix, lookups=lookups, reflection=_reflection)
@@ -178,11 +230,14 @@ def printTemplate(filename :      str,
                   threshold :     float = 0,
                   seed_attempts : int   = 1,
                   models :        list  = ["526mixV145_v145"],
+                  hires_fix :     float = None,
                   args :          str   = None,
                   seed :          int   = None):
   "This function prints a template file in the same format as invokeai-batch outputs, run with `invoke --from_file filename`"
   if args is None:
     args = "-A" + sampler + " -C" + str(cfg) + " -s" + str(steps) + "  --perlin=" + str(perlin) + " --threshold=" + str(threshold) + " -W" + str(width) + " -H" + str(height)
+    if hires_fix is not None:
+      args = args + " --hires_fix -f" + str(hires_fix)
   if prompts is None:
     prompts = makePrompts(300)
   promptLines = []
