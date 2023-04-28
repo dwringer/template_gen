@@ -30,19 +30,12 @@ def prefixer(a : str, b: str):
       _newB = _bWeighting[2]
       _bWeighting = _bWeighting[1]
     # now subtract the parens that cancel out:
-    _newAWeighting = _aWeighting
-    _newBWeighting = ""
-    for char in _bWeighting:
-      if char == '(':
-        _newAWeighting = _aWeighting.replace(")", "", 1)
-        if _newAWeighting == _aWeighting:
-          _newBWeighting = _newBWeighting + char
-        _aWeighting = _newAWeighting
-      else:
-        _newBWeighting = _newBWeighting + char
+    _newAWeighting = _aWeighting.replace(")", "", _bWeighting.count("("))
+    _nSubs = len(_aWeighting) - len(_newAWeighting)
+    _newBWeighting = _bWeighting.replace("(", "", _nSubs) if (0 < _nSubs) else _bWeighting
     _raw = _newBWeighting + _newA + _newB + _newAWeighting
     # print("> " + _newBWeighting + " || " + _newA + " || " + _newB + " || " + _newAWeighting)
-    # then subtract trailing +-'s that cancel
+    # subtract trailing +-'s that cancel:
     result = _raw.replace("+-", "", 1)
     while _raw != result:
       _raw = result
@@ -128,18 +121,11 @@ def templateExpand(s :          str,
   for word in _split:
     if re.fullmatch(r'({\w+})', word):
       _lookup = random.choice(lookups[word[1:-1]])
-      _resultAppendix, _reflectionPrependix = None, None
       if isinstance(_lookup, (list, listconfig.ListConfig)):
-        _resultAppendix = _lookup[0]
-        _reflectionPrependix = _lookup[1]
-#        result = result + _lookup[0]
-#        reflection = " " + _lookup[1] + reflection
+        result = result + _lookup[0]
+        reflection = " " + _lookup[1] + reflection
       else:
-        _resultAppendix = _lookup
-#        result = result + _lookup
-      result = result + _resultAppendix
-      if _reflectionPrependix is not None:
-        reflection = " " + _reflectionPrependix + reflection
+        result = result + _lookup
     else:
       result = result + word
   return result, reflection
