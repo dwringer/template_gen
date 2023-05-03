@@ -114,20 +114,29 @@ def loadTemplate(filename : str):
 
 def templateExpand(s :          str,
                    lookups :    dict = LOOKUP_TABLE,
-                   reflection : str  = ""):
+                   reflection : str  = "",
+                   identities : dict = {}):
   "Used internally to replace words with their template lookups. Single pass."
-  _split = re.split(r'({\w+})', s)
+  _split = re.split(r'({[\d:\w]+})', s)
   result = ""
   for word in _split:
-    if re.fullmatch(r'({\w+})', word):
-      _lookup = random.choice(lookups[word[1:-1]])
-      if isinstance(_lookup, (list, listconfig.ListConfig)):
-        result = result + _lookup[0]
-        reflection = " " + _lookup[1] + reflection
+    _lookup = None
+    _identifies = re.fullmatch(r'{(\d+):(\w+)}', word)
+    if _identifies:
+      if not (word in identities):
+        _lookup = random.choice(lookups[_identifies[2]])
+        identities[word] = _lookup
       else:
-        result = result + _lookup
+        _lookup = identities[word]
+    elif re.fullmatch(r'({\w+})', word):
+      _lookup = random.choice(lookups[word[1:-1]])
     else:
-      result = result + word
+      _lookup = word
+    if isinstance(_lookup, (list, listconfig.ListConfig)):
+      result = result + _lookup[0]
+      reflection = " " + _lookup[1] + reflection
+    else:
+      result = result + _lookup
   return result, reflection
 
 def makePrompts(n :                        int,
@@ -143,7 +152,7 @@ def makePrompts(n :                        int,
   if base_negatives is None:
     base_negatives = lookups['negatives']
   for i in range(n):
-    _str, _reflection = templateExpand(random.choice(template_strings), reflection="")
+    _str, _reflection = templateExpand(random.choice(template_strings), lookups=lookups, reflection="")
     _next, _reflection = templateExpand(_str, lookups=lookups, reflection=_reflection)
     while ((_next != _str) or (re.search(r'{\w+}', _str))):
       _str = _next
